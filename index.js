@@ -1,33 +1,51 @@
 const express = require("express");
-const OpenAI = require("openai"); // ✅ 新版写法
+const OpenAI = require("openai");
 require("dotenv").config();
 
 const app = express();
 app.use(express.json());
 
-// ✅ 初始化 openai 实例（无 Configuration）
+// ✅ 初始化 OpenAI 实例
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
 app.post("/", async (req, res) => {
-  const text = req.body?.messages?.[0]?.text || "";
   try {
-    const response = await openai.chat.completions.create({  // ✅ 新写法
+    const messages = req.body?.messages;
+    const text = messages?.[0]?.text;
+
+    if (!text) {
+      return res.status(400).json({ error: "Invalid input: text is missing." });
+    }
+
+    console.log("🔹 Received text:", text);
+
+    const response = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
-        { role: "system", content: "You are a language detector. Reply only with 'zh' for Chinese, 'en' for English, or 'km' for Khmer." },
-        { role: "user", content: text }
+        {
+          role: "system",
+          content: "You are a language detector. Reply only with 'zh' for Chinese, 'en' for English, or 'km' for Khmer."
+        },
+        {
+          role: "user",
+          content: text
+        }
       ]
     });
 
-    const language = response.choices[0].message.content.trim();
+    const language = response.choices?.[0]?.message?.content?.trim() || "unknown";
+    console.log("✅ Detected language:", language);
+
     res.json({ metadata: { language } });
   } catch (err) {
-    console.error("Detection error:", err.message);
-    res.status(500).send("Language detection failed");
+    console.error("❌ Detection error:", err);
+    res.status(500).json({ error: "Language detection failed." });
   }
 });
 
-const port = process.env.PORT
-app.listen(port, () => console.log("✅ Language detection webhook running on port", port));
+const port = process.env.PORT;
+app.listen(port, () => {
+  console.log(`✅ Language detection webhook running on port ${port}`);
+});
